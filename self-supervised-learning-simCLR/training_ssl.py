@@ -1,14 +1,16 @@
 import os
+from copy import deepcopy
 from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 from torchvision import transforms
 from torchvision.datasets import STL10, CIFAR100
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+from tqdm import tqdm
 
 from data_prepration import ContrastiveTransformations, LoadUnlabelData
 from simclr_model import SimCLR
@@ -17,6 +19,7 @@ from simclr_model import SimCLR
 DEVICE = torch.device('mps')
 DATASET_PATH = '/Users/hoanglinh96nl'
 CHECKPOINT_PATH = 'saved_model'
+
 
 if __name__ == '__main__':
     # %% Data preparation for self-supvervised learning
@@ -42,12 +45,12 @@ if __name__ == '__main__':
                                     LearningRateMonitor('epoch')])
     trainer.logger._default_hp_metric = None
 
-    pretrained_filename = input('Enter path of pretrained model (Y/N): ')
-    if pretrained_filename == 'N':
-        train_dataloader = DataLoader(dataset=unlabeled_data, batch_size=batch_size, shuffle=True,
-                                      drop_last=True, pin_memory=True, num_workers=9, persistent_workers=True)
-        val_dataloader = DataLoader(train_data_contrast, batch_size=batch_size, shuffle=False,
-                                drop_last=False, pin_memory=True, num_workers=9, persistent_workers=True)
-        simclr_model = SimCLR(hidden_dim=hidden_dim, learning_rate=learning_rate, temperature=temperature,
-                              weight_decay=weight_decay, max_epochs=max_epochs)
-        trainer.fit(model=simclr_model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+    train_dataloader = DataLoader(dataset=unlabeled_data, batch_size=batch_size, shuffle=True,
+                                    drop_last=True, pin_memory=True, num_workers=9, persistent_workers=True)
+    val_dataloader = DataLoader(train_data_contrast, batch_size=batch_size, shuffle=False,
+                            drop_last=False, pin_memory=True, num_workers=9, persistent_workers=True)
+    simclr_model = SimCLR(hidden_dim=hidden_dim, learning_rate=learning_rate, temperature=temperature,
+                            weight_decay=weight_decay, max_epochs=max_epochs)
+    trainer.fit(model=simclr_model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+    
+    
