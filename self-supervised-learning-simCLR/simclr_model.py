@@ -4,17 +4,18 @@ import torch.nn as nn
 import torchvision
 
 
-class SimCLR(pl.LightningDataModule):
+class SimCLR(pl.LightningModule):
     def __init__(self, hidden_dim, learning_rate, temperature, weight_decay, max_epochs=100):
         super(SimCLR, self).__init__()
         self.save_hyperparameters()
         assert self.hparams.temperature > 0.0, f'The temperature = {temperature} smaller than 0!' 
         
-        self.convnet = torchvision.models.resnet18(num_classes=4*hidden_dim)
-        self.convnet.fc = nn.Sequential([
+        self.convnet = torchvision.models.resnet18(num_classes=4*hidden_dim).to(torch.device('mps'))
+        
+        self.convnet.fc = nn.Sequential(
             self.convnet.fc,  # Linear(Resnet output, 4*hidden_dim)
             nn.ReLU(inplace=True), nn.Linear(4*hidden_dim, hidden_dim)
-        ])
+        )
         
     def configure_optimizers(self):
         optimzier = torch.optim.AdamW(params=self.convnet.parameters(), lr=self.hparams.learning_rate,
@@ -27,7 +28,7 @@ class SimCLR(pl.LightningDataModule):
         return self.info_nce_loss(batch, mode='train')
     
     def validation_step(self, batch, batch_idx):
-        return self.info_nce_loss(batch, model='val')
+        return self.info_nce_loss(batch, mode='val')
     
     def info_nce_loss(self, batch, mode='train'):
         imgs, _ = batch
@@ -46,7 +47,7 @@ class SimCLR(pl.LightningDataModule):
         nll = nll.mean()
         
         # get ranking positive example
-        comb_sim = torch.cat([cos_sim[pos_mask][: None], cos_sim.masked_fill(pos_mask, -9e15)], dim=-1)
+        comb_sim = torch.cat([cos_sim[pos_mask][:, None], cos_sim.masked_fill(pos_mask, -9e15)], dim=-1)
         sim_argsort = comb_sim.argsort(dim=-1, descending=True,).argmin(dim=-1)
                 
         # logging loss
